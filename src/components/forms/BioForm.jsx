@@ -23,18 +23,32 @@ import { supabase } from '../../config/supabase'
 const BioForm = () => {
   const [bio, setBio] = useState({
     name: '',
-    roles: [],
+    roles: [], // Should be configured as a text array in Supabase
     description: '',
     github: '',
     resume: '',
     linkedin: '',
     twitter: '',
     insta: '',
-    image: '',
+    Image: '',
   })
+  const [copyright, setCopyright] = useState('')
+  const [roleInput, setRoleInput] = useState('')
+
+  const commonButtonSx = {
+    backgroundColor: '#0F172A',
+    '&:hover': { backgroundColor: '#1E293B' },
+    borderRadius: 2,
+    textTransform: 'none',
+    px: 4,
+    minWidth: { xs: '100%', sm: '160px' }, // Set minimum width for consistency
+    height: 42, // Set fixed height
+    fontSize: '0.875rem', // Set consistent font size
+  }
 
   useEffect(() => {
     fetchBio()
+    fetchCopyright()
   }, [])
 
   const fetchBio = async () => {
@@ -46,7 +60,11 @@ const BioForm = () => {
 
       if (error) throw error
       console.log('Fetched bio:', data)
-      setBio(data || {})
+      setBio({
+        ...data,
+        roles: Array.isArray(data?.roles) ? data.roles : [], // Ensure roles is always an array
+      })
+      setRoleInput(Array.isArray(data?.roles) ? data.roles.join(', ') : '') // Set initial role input
     } catch (error) {
       console.error('Error fetching bio:', error)
       toast.error('Error fetching bio: ' + error.message)
@@ -60,9 +78,14 @@ const BioForm = () => {
         return
       }
 
+      const bioData = {
+        ...bio,
+        roles: Array.isArray(bio.roles) ? bio.roles : [], // Ensure roles is an array before saving
+      }
+
       const { error } = await supabase
         .from('bio')
-        .upsert(bio)
+        .upsert(bioData)
 
       if (error) throw error
 
@@ -72,6 +95,57 @@ const BioForm = () => {
       console.error('Error saving bio:', error)
       toast.error('Error saving bio: ' + error.message)
     }
+  }
+
+  const fetchCopyright = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('copyright')
+        .select('*')
+        .single()
+
+      if (error) throw error
+      console.log('Fetched copyright:', data)
+      setCopyright(data?.copyright || '')
+    } catch (error) {
+      console.error('Error fetching copyright:', error)
+      toast.error('Error fetching copyright: ' + error.message)
+    }
+  }
+
+  const handleCopyrightSubmit = async () => {
+    try {
+      const { error } = await supabase
+        .from('copyright')
+        .upsert({ 
+          id: 1, // Assuming you have only one copyright record
+          copyright: copyright.trim() 
+        })
+
+      if (error) throw error
+
+      await fetchCopyright()
+      toast.success('Copyright updated successfully')
+    } catch (error) {
+      console.error('Error saving copyright:', error)
+      toast.error('Error saving copyright: ' + error.message)
+    }
+  }
+
+  const handleRoleChange = (e) => {
+    const value = e.target.value
+    setRoleInput(value) // Update the temporary input state
+
+    // Update the actual roles array only when needed
+    const rolesArray = value
+      .split(',')
+      .map(role => role.trim())
+      .filter(Boolean)
+    
+    setBio(prev => ({
+      ...prev,
+      roles: rolesArray
+    }))
   }
 
   return (
@@ -93,7 +167,7 @@ const BioForm = () => {
 
         <Box sx={{ p: 4 }}>
           <Grid container spacing={4}>
-            {/* Profile image */}
+            {/* Profile Image */}
             <Grid item xs={12} display="flex" justifyContent="center">
               <Box sx={{ position: 'relative' }}>
                 <Avatar
@@ -109,13 +183,13 @@ const BioForm = () => {
               </Box>
             </Grid>
 
-            {/* Profile image URL */}
+            {/* Profile Image URL */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Profile image URL"
+                label="Profile Image URL"
                 value={bio.image || ''}
-                onChange={(e) => setBio({ ...bio, image: e.target.value })}
+                onChange={(e) => setBio({ ...bio, Image: e.target.value })}
               />
             </Grid>
 
@@ -135,12 +209,9 @@ const BioForm = () => {
               <TextField
                 fullWidth
                 label="Roles (comma-separated)"
-                value={Array.isArray(bio.roles) ? bio.roles.join(', ') : ''}
-                onChange={(e) => setBio({ 
-                  ...bio, 
-                  roles: e.target.value.split(',').map(role => role.trim()).filter(Boolean)
-                })}
-                helperText="Enter roles separated by commas"
+                value={roleInput} // Use roleInput instead of converting roles array
+                onChange={handleRoleChange}
+                helperText="Enter roles separated by commas (e.g., Developer, Designer, Writer)"
               />
             </Grid>
 
@@ -220,18 +291,16 @@ const BioForm = () => {
 
             {/* Save Button */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: { xs: 'center', sm: 'flex-end' },
+                mt: 2 
+              }}>
                 <Button
                   variant="contained"
                   startIcon={<SaveIcon />}
                   onClick={handleSubmit}
-                  sx={{
-                    backgroundColor: '#0F172A',
-                    '&:hover': { backgroundColor: '#1E293B' },
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    px: 4,
-                  }}
+                  sx={commonButtonSx}
                 >
                   Save Changes
                 </Button>
@@ -309,8 +378,54 @@ const BioForm = () => {
           )}
         </Box>
       </Paper>
+
+      {/* Copyright Section */}
+      <Paper sx={{ mt: 3, p: { xs: 2, sm: 3 }, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          mb: 3 
+        }}>
+          <Typography variant="h6" sx={{ color: '#1E293B', mb: { xs: 2, sm: 0 } }}>
+            Copyright Information
+          </Typography>
+        </Box>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <TextField
+            fullWidth
+            label="Copyright Text"
+            value={copyright}
+            onChange={(e) => setCopyright(e.target.value)}
+            helperText="Example: © 2024 Your Name. All rights reserved."
+          />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ color: '#64748B' }}>
+              Preview: {copyright || 'No copyright text set'}
+            </Typography>
+          </Box>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: { xs: 'stretch', sm: 'flex-end' }
+          }}>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleCopyrightSubmit}
+              sx={commonButtonSx}
+            >
+              Save Copyright
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
     </Box>
   )
 }
 
-export default BioForm 
+export default BioForm

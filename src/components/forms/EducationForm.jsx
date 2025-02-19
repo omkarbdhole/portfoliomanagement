@@ -19,16 +19,11 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   School as SchoolIcon,
-  CalendarToday as CalendarIcon,
-  Grade as GradeIcon,
   Save as SaveIcon,
   Close as CloseIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import { supabase } from '../../config/supabase'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
 
 const EducationForm = () => {
@@ -43,6 +38,15 @@ const EducationForm = () => {
     description: '',
     img: '',
   })
+
+  const commonButtonSx = {
+    backgroundColor: '#0F172A',
+    '&:hover': { backgroundColor: '#1E293B' },
+    borderRadius: 2,
+    textTransform: 'none',
+    px: 3,
+    py: 1,
+  }
 
   useEffect(() => {
     fetchEducations()
@@ -158,14 +162,7 @@ const EducationForm = () => {
     })
   }
 
-  const handleImageChange = (e) => {
-    const imageUrl = e.target.value
-    console.log('New image URL:', imageUrl)
-    setCurrentEducation(prev => ({
-      ...prev,
-      img: imageUrl
-    }))
-  }
+
 
   return (
     <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
@@ -213,23 +210,14 @@ const EducationForm = () => {
               setEditMode(false)
               setOpen(true)
             }}
-            sx={{
-              backgroundColor: '#0F172A',
-              '&:hover': {
-                backgroundColor: '#1E293B',
-              },
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-              py: 1,
-            }}
+            sx={commonButtonSx}
           >
             Add Education
           </Button>
         </Box>
 
         <Box sx={{ p: 4 }}>
-          <Grid container spacing={3}>
+          <Grid container spacing={3} >
             {educations.map((education) => {
               console.log('Education entry:', education)
               return (
@@ -432,13 +420,20 @@ const EducationForm = () => {
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleClose} color="inherit">
+          <Button 
+            onClick={handleClose} 
+            sx={{ 
+              color: '#64748B',
+              '&:hover': { backgroundColor: '#F1F5F9' }
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
             startIcon={<SaveIcon />}
+            sx={commonButtonSx}
           >
             {editMode ? 'Save Changes' : 'Add Education'}
           </Button>
@@ -448,4 +443,4 @@ const EducationForm = () => {
   )
 }
 
-export default EducationForm 
+export default EducationForm
