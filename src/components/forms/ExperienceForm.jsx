@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+// Packages
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -14,7 +15,8 @@ import {
   TextField,
   Chip,
   Stack,
-} from '@mui/material'
+  Fab,
+} from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -22,260 +24,862 @@ import {
   Work as WorkIcon,
   Save as SaveIcon,
   Close as CloseIcon,
-} from '@mui/icons-material'
-import { toast } from 'react-toastify'
-import { supabase } from '../../config/supabase'
+  CheckCircleOutline as SuccessIcon,
+  ErrorOutline as ErrorIcon,
+  Info as InfoIcon,
+  Sync as LoadingIcon,
+  Code as CodeIcon,
+  Warning as WarningIcon,
+} from "@mui/icons-material";
+import { Toaster, toast } from "react-hot-toast";
+import { styled } from "@mui/material/styles";
+import { motion, AnimatePresence } from "framer-motion";
+
+// Components & Services
+import { experienceApi } from "../../Api/SupabaseData";
+import { useScrollLock } from "../../Hooks/UseScrollLock";
+
+const StyledDialog = styled(Dialog)`
+  .MuiDialog-paper {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(241, 245, 249, 0.2);
+    border-radius: 24px;
+    box-shadow: rgb(0 0 0 / 8%) 0px 20px 40px, rgb(0 0 0 / 6%) 0px 1px 3px;
+    overflow: hidden;
+  }
+`;
+
+const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
+  background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+  color: "white",
+  padding: "24px",
+  position: "relative",
+  "&::after": {
+    content: '""',
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "1px",
+    background:
+      "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)",
+  },
+}));
+
+const styles = {
+  container: {
+    maxWidth: "100%",
+    margin: "0 auto",
+    p: { xs: 2, sm: 3 },
+    "@media (min-width: 1200px)": {
+      maxWidth: 1200,
+    },
+  },
+
+  paper: {
+    borderRadius: { xs: 2, sm: 4 },
+    overflow: "hidden",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+    background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+  },
+
+  gradientHeader: {
+    background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+    color: "white",
+    p: { xs: 2.5, sm: 4 },
+  },
+
+  headerText: {
+    fontSize: { xs: "1.75rem", sm: "2rem", md: "2.25rem" },
+    lineHeight: { xs: 1.3, sm: 1.4 },
+    background: "linear-gradient(135deg, #E2E8F0 0%, #FFFFFF 100%)",
+    backgroundClip: "text",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    fontWeight: 700,
+    letterSpacing: "-0.01em",
+  },
+
+  card: {
+    p: { xs: 2, sm: 3 },
+    borderRadius: { xs: 2, sm: 3 },
+    backgroundColor: "white",
+    transition: "all 0.3s ease",
+    border: "1px solid rgba(241, 245, 249, 0.1)",
+    "&:hover": {
+      transform: { xs: "none", sm: "translateY(-4px)" },
+      boxShadow: {
+        xs: "0 4px 12px rgba(0,0,0,0.05)",
+        sm: "0 12px 24px rgba(0,0,0,0.1)",
+      },
+    },
+  },
+
+  companyLogo: {
+    width: { xs: "80px", sm: "100%" },
+    height: { xs: "80px", sm: "auto" },
+    margin: { xs: "0 auto", sm: 0 },
+    aspectRatio: "1",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    bgcolor: "#F8FAFC",
+    borderRadius: { xs: "12px", sm: "16px" },
+    overflow: "hidden",
+    border: "1px solid",
+    borderColor: "grey.200",
+    p: { xs: 1.5, sm: 2 },
+    transition: "transform 0.3s ease",
+    "&:hover": {
+      transform: { xs: "scale(1.02)", sm: "scale(1.05)" },
+    },
+  },
+
+  contentWrapper: {
+    flexDirection: { xs: "column", sm: "row" },
+    alignItems: { xs: "center", sm: "flex-start" },
+    textAlign: { xs: "center", sm: "left" },
+    gap: { xs: 2, sm: 3 },
+  },
+
+  actionButtons: {
+    display: "flex",
+    justifyContent: { xs: "center", sm: "flex-end" },
+    mt: { xs: 2, sm: 0 },
+    gap: 1,
+  },
+
+  fabButton: {
+    position: "fixed",
+    bottom: 20,
+    right: 20,
+    display: { xs: "flex", sm: "none" },
+    background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+    "&:hover": {
+      background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+    },
+  },
+  dialogContent: {
+    p: 3,
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)",
+  },
+  cancelButton: {
+    borderColor: "#E2E8F0",
+    color: "#64748B",
+    borderRadius: "12px",
+    textTransform: "none",
+    fontWeight: 500,
+    px: 3,
+    "&:hover": {
+      borderColor: "#CBD5E1",
+      backgroundColor: "#F1F5F9",
+      transform: "translateY(-2px)",
+    },
+    transition: "all 0.2s ease-in-out",
+  },
+  deleteButton: {
+    background: "linear-gradient(135deg, #DC2626 0%, #EF4444 100%)",
+    color: "white",
+    px: 3,
+    py: 1.5,
+    borderRadius: "12px",
+    textTransform: "none",
+    fontWeight: 600,
+    boxShadow: "0 4px 12px rgba(239,68,68,0.2)",
+    "&:hover": {
+      background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 6px 16px rgba(239,68,68,0.3)",
+    },
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+  },
+};
+
+const dialogStyles = {
+  paper: {
+    width: { xs: "95%", sm: "100%" },
+    maxWidth: { xs: "100%", sm: 800 },
+    m: { xs: 2, sm: 4 },
+    borderRadius: { xs: 2, sm: 3 },
+  },
+  content: {
+    p: { xs: 2.5, sm: 3 },
+    pt: { xs: 3, sm: 4 }, // Add more top padding
+    mt: 1, // Add margin top
+    "& .MuiTextField-root": {
+      mb: { xs: 2, sm: 2.5 },
+    },
+  },
+  header: {
+    background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+    color: "white",
+    px: { xs: 2, sm: 3 },
+    py: { xs: 2, sm: 2.5 }, // Increase vertical padding
+  },
+};
+
+const toastConfig = {
+  position: "top-center",
+  style: {
+    background: "rgba(15, 23, 42, 0.95)",
+    color: "white",
+    backdropFilter: "blur(8px)",
+    borderRadius: "16px",
+    padding: "16px 24px",
+    maxWidth: "500px",
+    width: "90%",
+    border: "1px solid rgba(255,255,255,0.1)",
+    fontSize: "14px",
+    fontWeight: 500,
+    boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+  },
+  success: {
+    icon: (
+      <SuccessIcon
+        sx={{
+          animation: "rotate 0.5s ease-out",
+          "@keyframes rotate": {
+            "0%": { transform: "scale(0.5) rotate(-180deg)" },
+            "100%": { transform: "scale(1) rotate(0)" },
+          },
+        }}
+      />
+    ),
+    duration: 2000,
+  },
+  error: {
+    icon: (
+      <ErrorIcon
+        sx={{
+          animation: "shake 0.5s ease-in-out",
+          "@keyframes shake": {
+            "0%, 100%": { transform: "translateX(0)" },
+            "25%": { transform: "translateX(-4px)" },
+            "75%": { transform: "translateX(4px)" },
+          },
+        }}
+      />
+    ),
+    duration: 3000,
+  },
+  loading: {
+    icon: (
+      <LoadingIcon
+        sx={{
+          animation: "spin 1s linear infinite",
+          "@keyframes spin": {
+            "0%": { transform: "rotate(0deg)" },
+            "100%": { transform: "rotate(360deg)" },
+          },
+        }}
+      />
+    ),
+    duration: Infinity,
+  },
+};
+
+// Add this near your other styles
+const chipStyles = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: { xs: 1, sm: 1.5 },
+  mt: 2,
+  "& .MuiChip-root": {
+    height: { xs: 28, sm: 32 },
+    borderRadius: { xs: "8px", sm: "10px" },
+    fontSize: { xs: "0.75rem", sm: "0.875rem" },
+    "& .MuiChip-label": {
+      px: { xs: 1.5, sm: 2 },
+    },
+  },
+};
+
+const buttonStyles = {
+  addButton: {
+    background: "linear-gradient(135deg, #E2E8F0 0%, #FFFFFF 100%)",
+    color: "#0F172A",
+    fontWeight: 600,
+    px: { xs: 2, sm: 3 },
+    py: { xs: 1, sm: 1.5 },
+    borderRadius: "12px",
+    textTransform: "none",
+    boxShadow: "0 4px 12px rgba(255,255,255,0.15)",
+    "&:hover": {
+      background: "linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 6px 16px rgba(255,255,255,0.2)",
+    },
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    fontSize: { xs: "0.875rem", sm: "1rem" },
+  },
+
+  dialogButton: {
+    background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+    color: "white",
+    fontWeight: 600,
+    px: 3,
+    py: 1.5,
+    borderRadius: "12px",
+    textTransform: "none",
+    "&:hover": {
+      background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    },
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  },
+
+  deleteButton: {
+    background: "linear-gradient(135deg, #DC2626 0%, #EF4444 100%)",
+    color: "white",
+    fontWeight: 600,
+    px: 3,
+    py: 1.5,
+    borderRadius: "12px",
+    textTransform: "none",
+    "&:hover": {
+      background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 4px 12px rgba(239,68,68,0.25)",
+    },
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  },
+};
+
+// Add these skill input specific styles
+const skillStyles = {
+  inputContainer: {
+    position: "relative",
+    width: "100%",
+  },
+
+  skillInput: {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "12px",
+      backgroundColor: "#F8FAFC",
+      minHeight: { xs: "48px", sm: "56px" },
+      fontSize: { xs: "0.875rem", sm: "1rem" },
+      transition: "all 0.2s ease-in-out",
+      "&:hover": {
+        backgroundColor: "#F1F5F9",
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: "#94A3B8",
+          borderWidth: "2px",
+        },
+      },
+    },
+    "& .MuiInputLabel-root": {
+      fontSize: { xs: "0.875rem", sm: "1rem" },
+      color: "#64748B",
+      "&.Mui-focused": {
+        color: "#0F172A",
+      },
+    },
+    "& .MuiFormHelperText-root": {
+      margin: { xs: "4px 0 0 0", sm: "8px 0 0 0" },
+      fontSize: { xs: "0.75rem", sm: "0.813rem" },
+      color: "#94A3B8",
+    },
+  },
+
+  addButton: {
+    minWidth: "unset",
+    height: "36px",
+    px: { xs: 2, sm: 3 },
+    ml: 1,
+    borderRadius: "10px",
+    background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+    color: "white",
+    fontSize: { xs: "0.813rem", sm: "0.875rem" },
+    fontWeight: 600,
+    textTransform: "none",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    "&:hover": {
+      background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 6px 16px rgba(0,0,0,0.12)",
+    },
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    "&.Mui-disabled": {
+      background: "#E2E8F0",
+      color: "#94A3B8",
+    },
+  },
+
+  chipContainer: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: { xs: 1, sm: 1.5 },
+    mt: 2,
+    px: { xs: 1, sm: 0 },
+    justifyContent: { xs: "center", sm: "flex-start" },
+  },
+
+  chip: {
+    height: { xs: 32, sm: 36 },
+    borderRadius: "10px",
+    px: { xs: 1, sm: 1.5 },
+    "& .MuiChip-label": {
+      px: { xs: 1.5, sm: 2 },
+      fontSize: { xs: "0.813rem", sm: "0.875rem" },
+      fontWeight: 600,
+    },
+    "& .MuiChip-deleteIcon": {
+      fontSize: { xs: "1.125rem", sm: "1.25rem" },
+      margin: { xs: "0 4px", sm: "0 5px" },
+      color: "inherit",
+      opacity: 0.7,
+      transition: "all 0.2s ease",
+      "&:hover": {
+        opacity: 1,
+        transform: "scale(1.1)",
+      },
+    },
+  },
+};
+
+// Add these form field styles
+const formFieldStyles = {
+  textField: {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "12px",
+      backgroundColor: "#F8FAFC",
+      minHeight: { xs: "48px", sm: "56px" },
+      fontSize: { xs: "0.875rem", sm: "1rem" },
+      transition: "all 0.2s ease-in-out",
+      "&:hover": {
+        backgroundColor: "#F1F5F9",
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: "#94A3B8",
+          borderWidth: "2px",
+        },
+      },
+      "&.Mui-focused": {
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: "#0F172A",
+          borderWidth: "2px",
+        },
+      },
+      "&.MuiInputBase-multiline": {
+        padding: "12px",
+      },
+    },
+    "& .MuiInputLabel-root": {
+      fontSize: { xs: "0.875rem", sm: "1rem" },
+      color: "#64748B",
+      "&.Mui-focused": {
+        color: "#0F172A",
+      },
+    },
+    "& .MuiFormHelperText-root": {
+      margin: { xs: "4px 0 0 0", sm: "8px 0 0 0" },
+      fontSize: { xs: "0.75rem", sm: "0.813rem" },
+      color: "#94A3B8",
+    },
+  },
+};
 
 const ExperienceForm = () => {
-  const [experiences, setExperiences] = useState([])
-  const [open, setOpen] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const { enableBodyScroll, disableBodyScroll } = useScrollLock();
+  const [experiences, setExperiences] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [currentExperience, setCurrentExperience] = useState({
-    img: '',
-    role: '',
-    company: '',
-    date: '',
-    description: '',
-    description2: '',
-    description3: '',
+    img: "",
+    role: "",
+    company: "",
+    date: "",
+    description: "",
+    description2: "",
+    description3: "",
     skills: [],
-    doc: '',
-  })
+    doc: "",
+  });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [skillInput, setSkillInput] = useState("");
+  const [skillToDelete, setSkillToDelete] = useState(null);
+  const [skillDialogOpen, setSkillDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchExperiences()
-  }, [])
+    fetchExperiences();
+  }, []);
 
   const fetchExperiences = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('experiences')
-        .select('*')
+    const loadingToast = toast.loading(
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Typography>Loading experience details...</Typography>
+      </Box>,
+      { ...toastConfig }
+    );
 
-      if (error) throw error
-      console.log('Fetched experience data:', data)
-      setExperiences(data || [])
+    try {
+      const data = await experienceApi.fetch();
+      setExperiences(data || []);
+      toast.success(
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography>Information loaded successfully</Typography>
+        </Box>,
+        {
+          ...toastConfig,
+          id: loadingToast,
+        }
+      );
     } catch (error) {
-      console.error('Error details:', error)
-      toast.error('Error fetching experience data: ' + error.message)
+      console.error("Error details:", error);
+      toast.error(
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography>Failed to load experiences</Typography>
+        </Box>,
+        {
+          ...toastConfig,
+          id: loadingToast,
+        }
+      );
     }
-  }
+  };
 
   const handleSubmit = async () => {
+    if (!currentExperience.role || !currentExperience.company) {
+      toast.error(
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography>Please fill in all required fields</Typography>
+        </Box>,
+        { ...toastConfig }
+      );
+      return;
+    }
+
+    const loadingToast = toast.loading(
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Typography>
+          {editMode ? "Updating" : "Adding"} experience...
+        </Typography>
+      </Box>,
+      { ...toastConfig }
+    );
+
     try {
-      if (!currentExperience.role || !currentExperience.company) {
-        toast.error('Please fill in all required fields')
-        return
+      if (editMode) {
+        await experienceApi.update(currentExperience);
+      } else {
+        await experienceApi.create(currentExperience);
       }
 
-      const { error } = await supabase
-        .from('experiences')
-        .upsert({
-          ...currentExperience,
-          id: editMode ? currentExperience.id : undefined
-        })
+      await fetchExperiences();
+      handleClose();
 
-      if (error) throw error
-
-      await fetchExperiences()
-      handleClose()
-      toast.success(editMode ? 'Experience updated successfully' : 'Experience added successfully')
+      toast.success(
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography>
+            Experience {editMode ? "updated" : "added"} successfully
+          </Typography>
+        </Box>,
+        {
+          ...toastConfig,
+          id: loadingToast,
+        }
+      );
     } catch (error) {
-      console.error('Error details:', error)
-      toast.error('Error saving experience: ' + error.message)
+      toast.error(
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography>
+            Failed to {editMode ? "update" : "add"} experience
+          </Typography>
+        </Box>,
+        {
+          ...toastConfig,
+          id: loadingToast,
+        }
+      );
     }
-  }
+  };
 
   const handleEdit = (experience) => {
-    setCurrentExperience(experience)
-    setEditMode(true)
-    setOpen(true)
-  }
+    setCurrentExperience(experience);
+    setEditMode(true);
+    setOpen(true);
+  };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (experienceId) => {
+    const experienceToDelete = experiences.find(
+      (exp) => exp.id === experienceId
+    );
+    setItemToDelete(experienceToDelete); // Set the entire experience object
+    setDeleteDialogOpen(true);
+    disableBodyScroll();
+  };
+
+  const handleConfirmDelete = async () => {
+    const loadingToast = toast.loading("Deleting experience...");
     try {
-      const { error } = await supabase
-        .from('experiences')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
-      await fetchExperiences()
-      toast.success('Experience deleted successfully')
+      await experienceApi.delete(itemToDelete.id);
+      await fetchExperiences();
+      toast.dismiss(loadingToast);
+      toast.success("Experience deleted successfully");
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+      enableBodyScroll();
     } catch (error) {
-      toast.error('Error deleting experience: ' + error.message)
+      toast.dismiss(loadingToast);
+      toast.error("Error deleting experience: " + error.message);
     }
-  }
+  };
 
   const handleClose = () => {
-    setOpen(false)
-    setEditMode(false)
+    setOpen(false);
+    setEditMode(false);
     setCurrentExperience({
-      img: '',
-      role: '',
-      company: '',
-      date: '',
-      description: '',
-      description2: '',
-      description3: '',
+      img: "",
+      role: "",
+      company: "",
+      date: "",
+      description: "",
+      description2: "",
+      description3: "",
       skills: [],
-      doc: '',
-    })
-  }
+      doc: "",
+    });
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteDialogOpen(false);
+    setItemToDelete(null);
+    enableBodyScroll();
+  };
+
+  const handleSkillDelete = (skill) => {
+    setSkillToDelete(skill);
+    setSkillDialogOpen(true);
+    disableBodyScroll();
+  };
+
+  const handleConfirmSkillDelete = () => {
+    setCurrentExperience((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((s) => s !== skillToDelete),
+    }));
+    toast.success(`Removed skill: ${skillToDelete}`);
+    setSkillDialogOpen(false);
+    setSkillToDelete(null);
+    enableBodyScroll();
+  };
+
+  const handleCloseSkillDelete = () => {
+    setSkillDialogOpen(false);
+    setSkillToDelete(null);
+    enableBodyScroll();
+  };
 
   return (
-    <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
-      <Paper sx={{ borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#F8FAFC',
-          p: 4,
-          borderBottom: '1px solid',
-          borderColor: 'grey.200',
-        }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1E293B', mb: 1 }}>
-              Experience
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#64748B' }}>
-              Manage your work experience
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setEditMode(false)
-              setOpen(true)
-            }}
+    <Box sx={styles.container}>
+      <Paper sx={styles.paper}>
+        <Box sx={styles.gradientHeader}>
+          <Box
             sx={{
-              backgroundColor: '#0F172A',
-              '&:hover': { backgroundColor: '#1E293B' },
-              borderRadius: 2,
-              textTransform: 'none',
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between",
+              alignItems: { xs: "stretch", sm: "flex-start" },
+              gap: { xs: 2, sm: 0 },
             }}
           >
-            Add Experience
-          </Button>
+            <Box>
+              <Typography variant="h4" sx={styles.headerText}>
+                Experience
+              </Typography>
+              <Typography
+                variant="body1"
+                sx={{
+                  color: "#94A3B8",
+                  mt: 1,
+                  fontSize: { xs: "0.875rem", sm: "1rem" },
+                }}
+              >
+                Manage your work experience
+              </Typography>
+            </Box>
+
+            {/* Desktop Add Button */}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditMode(false);
+                setOpen(true);
+              }}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                ...buttonStyles.addButton,
+              }}
+            >
+              Add Experience
+            </Button>
+
+            {/* Mobile Add Button */}
+            <Button
+              variant="contained"
+              fullWidth
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditMode(false);
+                setOpen(true);
+              }}
+              sx={{
+                display: { xs: "flex", sm: "none" },
+                ...buttonStyles.addButton,
+                py: 1.5,
+              }}
+            >
+              Add Experience
+            </Button>
+          </Box>
         </Box>
 
-        <Box sx={{ p: 4 }}>
-          <Grid container spacing={3}>
+        <Box sx={{ p: { xs: 2, sm: 4 } }}>
+          <Grid container spacing={{ xs: 2, sm: 3 }}>
             {experiences.map((experience) => (
               <Grid item xs={12} key={experience.id}>
-                <Card sx={{
-                  p: 3,
-                  borderRadius: 3,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                }}>
-                  <Grid container spacing={3} alignItems="flex-start">
+                <Card sx={styles.card}>
+                  <Grid container sx={styles.contentWrapper}>
                     <Grid item xs={12} sm={2}>
-                      <Box
-                        sx={{
-                          width: '100%',
-                          minHeight: '100px',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          bgcolor: '#F8FAFC',
-                          borderRadius: '50%',
-                          overflow: 'hidden',
-                          border: '1px solid',
-                          borderColor: 'grey.200',
-                          p: 1,
-                        }}
-                      >
+                      <Box sx={styles.companyLogo}>
                         {experience.img ? (
                           <Box
                             component="img"
                             src={experience.img}
                             alt={experience.company}
                             sx={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
-                              display: 'block',
-                              borderRadius: '50%',
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                              borderRadius: "50%",
                             }}
                             onError={(e) => {
-                              console.log('Image load error for:', experience.company)
-                              e.target.onerror = null
-                              e.target.src = 'https://via.placeholder.com/100?text=No+Image'
+                              e.target.onerror = null;
+                              e.target.src =
+                                "https://via.placeholder.com/100?text=Company";
                             }}
                           />
                         ) : (
-                          <Box
-                            sx={{
-                              width: '60px',
-                              height: '60px',
-                              borderRadius: '50%',
-                              backgroundColor: '#E2E8F0',
-                              display: 'flex',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <WorkIcon sx={{ fontSize: 30, color: '#94A3B8' }} />
-                          </Box>
+                          <WorkIcon sx={{ fontSize: 40, color: "#94A3B8" }} />
                         )}
                       </Box>
                     </Grid>
 
                     <Grid item xs={12} sm={8}>
-                      <Typography variant="h6" sx={{ color: '#1E293B', mb: 1 }}>
-                        {experience.role}
-                      </Typography>
-                      <Typography variant="body1" sx={{ color: '#475569', mb: 0.5 }}>
-                        {experience.company}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748B', mb: 2 }}>
-                        {experience.date}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748B', mb: 1 }}>
-                        {experience.description}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748B', mb: 1 }}>
-                        {experience.description2}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748B', mb: 2 }}>
-                        {experience.description3}
-                      </Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-                        {experience.skills.map((skill, index) => (
-                          <Chip 
-                            key={index} 
-                            label={skill} 
-                            size="small"
-                            sx={{ 
-                              backgroundColor: '#F1F5F9',
-                              color: '#475569',
-                            }}
-                          />
-                        ))}
-                      </Stack>
+                      <Box sx={{ width: "100%" }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontSize: { xs: "1.125rem", sm: "1.25rem" },
+                            color: "#1E293B",
+                            fontWeight: 600,
+                            mb: 1,
+                          }}
+                        >
+                          {experience.role}
+                        </Typography>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            color: "#475569",
+                            fontWeight: 500,
+                            mb: 0.5,
+                          }}
+                        >
+                          {experience.company}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "#64748B",
+                            mb: 2,
+                          }}
+                        >
+                          {experience.date}
+                        </Typography>
+                        {[
+                          experience.description,
+                          experience.description2,
+                          experience.description3,
+                        ]
+                          .filter(Boolean)
+                          .map((desc, index) => (
+                            <Typography
+                              key={index}
+                              variant="body2"
+                              sx={{
+                                color: "#64748B",
+                                mb: 1,
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              {desc}
+                            </Typography>
+                          ))}
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          sx={{ gap: 1, mt: 2 }}
+                        >
+                          {experience.skills.map((skill, index) => (
+                            <Chip
+                              key={skill}
+                              label={skill}
+                              size="small"
+                              sx={{
+                                backgroundColor: `hsl(${
+                                  (index * 75) % 360
+                                }, 85%, 97%)`,
+                                color: `hsl(${(index * 75) % 360}, 85%, 35%)`,
+                                border: "1px solid",
+                                borderColor: `hsl(${
+                                  (index * 75) % 360
+                                }, 85%, 90%)`,
+                                fontWeight: 500,
+                                "&:hover": {
+                                  backgroundColor: `hsl(${
+                                    (index * 75) % 360
+                                  }, 85%, 95%)`,
+                                  borderColor: `hsl(${
+                                    (index * 75) % 360
+                                  }, 85%, 85%)`,
+                                },
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
                     </Grid>
 
                     <Grid item xs={12} sm={2}>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      <Box sx={styles.actionButtons}>
                         <IconButton
                           onClick={() => handleEdit(experience)}
-                          sx={{ 
-                            color: '#0F172A',
-                            '&:hover': { backgroundColor: '#F1F5F9' }
+                          sx={{
+                            color: "#0F172A",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              backgroundColor: "#F1F5F9",
+                              transform: "translateY(-2px)",
+                            },
                           }}
                         >
                           <EditIcon />
                         </IconButton>
                         <IconButton
                           onClick={() => handleDelete(experience.id)}
-                          sx={{ 
-                            color: '#EF4444',
-                            '&:hover': { backgroundColor: '#FEE2E2' }
+                          sx={{
+                            color: "#EF4444",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              backgroundColor: "#FEE2E2",
+                              transform: "translateY(-2px)",
+                            },
                           }}
                         >
                           <DeleteIcon />
@@ -290,36 +894,79 @@ const ExperienceForm = () => {
         </Box>
       </Paper>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" sx={{ color: '#1E293B', fontWeight: 600 }}>
-              {editMode ? 'Edit Experience' : 'Add Experience'}
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: dialogStyles.paper,
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+            color: "white",
+            px: 3,
+            py: 2,
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {editMode ? "Edit Experience" : "Add Experience"}
             </Typography>
-            <IconButton onClick={handleClose}>
+            <IconButton
+              onClick={handleClose}
+              sx={{
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                },
+              }}
+            >
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
+
+        <DialogContent
+          sx={{
+            ...dialogStyles.content,
+            "&.MuiDialogContent-root": {
+              paddingTop: "24px !important", // Override Material-UI's default padding
+            },
+          }}
+        >
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Company Logo URL"
-                value={currentExperience.img || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, img: e.target.value })}
+                value={currentExperience.img || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    img: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
               {currentExperience.img && (
                 <Box sx={{ mt: 2, mb: 2 }}>
                   <img
                     src={currentExperience.img}
                     alt="Company Logo"
-                    style={{ 
-                      maxHeight: 200, 
-                      maxWidth: '100%', 
-                      objectFit: 'contain',
-                      borderRadius: '50%',
+                    style={{
+                      maxHeight: 200,
+                      maxWidth: "100%",
+                      objectFit: "contain",
+                      borderRadius: "50%",
                     }}
                   />
                 </Box>
@@ -330,8 +977,14 @@ const ExperienceForm = () => {
                 fullWidth
                 required
                 label="Role"
-                value={currentExperience.role || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, role: e.target.value })}
+                value={currentExperience.role || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    role: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
@@ -339,8 +992,14 @@ const ExperienceForm = () => {
                 fullWidth
                 required
                 label="Company"
-                value={currentExperience.company || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, company: e.target.value })}
+                value={currentExperience.company || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    company: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
@@ -348,9 +1007,15 @@ const ExperienceForm = () => {
                 fullWidth
                 required
                 label="Date"
-                value={currentExperience.date || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, date: e.target.value })}
+                value={currentExperience.date || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    date: e.target.value,
+                  })
+                }
                 helperText="e.g., October 2022 - October 2023"
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
@@ -359,8 +1024,14 @@ const ExperienceForm = () => {
                 multiline
                 rows={2}
                 label="Description"
-                value={currentExperience.description || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, description: e.target.value })}
+                value={currentExperience.description || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    description: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
@@ -369,8 +1040,14 @@ const ExperienceForm = () => {
                 multiline
                 rows={2}
                 label="Description 2"
-                value={currentExperience.description2 || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, description2: e.target.value })}
+                value={currentExperience.description2 || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    description2: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
@@ -379,39 +1056,157 @@ const ExperienceForm = () => {
                 multiline
                 rows={2}
                 label="Description 3"
-                value={currentExperience.description3 || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, description3: e.target.value })}
+                value={currentExperience.description3 || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    description3: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Skills (comma-separated)"
-                value={Array.isArray(currentExperience.skills) ? currentExperience.skills.join(', ') : ''}
-                onChange={(e) => setCurrentExperience({ 
-                  ...currentExperience, 
-                  skills: e.target.value.split(',').map(skill => skill.trim()).filter(Boolean)
-                })}
-                helperText="Enter skills separated by commas"
-              />
+              <Box sx={skillStyles.inputContainer}>
+                <TextField
+                  fullWidth
+                  label="Add Skill"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && skillInput.trim()) {
+                      e.preventDefault();
+                      const newSkill = skillInput.trim();
+                      if (!currentExperience.skills.includes(newSkill)) {
+                        setCurrentExperience((prev) => ({
+                          ...prev,
+                          skills: [...prev.skills, newSkill],
+                        }));
+                        setSkillInput("");
+                        toast.success(`Added skill: ${newSkill}`, {
+                          icon: "🎯",
+                          duration: 2000,
+                        });
+                      } else {
+                        toast.error("This skill already exists", {
+                          icon: "⚠️",
+                          duration: 3000,
+                        });
+                      }
+                    }
+                  }}
+                  placeholder="Type a skill and press Enter"
+                  helperText="Press Enter or use the Add button to add a skill"
+                  sx={skillStyles.skillInput}
+                  InputProps={{
+                    endAdornment: (
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          const newSkill = skillInput.trim();
+                          if (
+                            newSkill &&
+                            !currentExperience.skills.includes(newSkill)
+                          ) {
+                            setCurrentExperience((prev) => ({
+                              ...prev,
+                              skills: [...prev.skills, newSkill],
+                            }));
+                            setSkillInput("");
+                            toast.success(`Added skill: ${newSkill}`, {
+                              icon: "🎯",
+                              duration: 2000,
+                            });
+                          } else if (
+                            currentExperience.skills.includes(newSkill)
+                          ) {
+                            toast.error("This skill already exists", {
+                              icon: "⚠️",
+                              duration: 3000,
+                            });
+                          }
+                        }}
+                        disabled={!skillInput.trim()}
+                        sx={skillStyles.addButton}
+                      >
+                        Add
+                      </Button>
+                    ),
+                  }}
+                />
+
+                <AnimatePresence>
+                  <Stack
+                    direction="row"
+                    flexWrap="wrap"
+                    sx={skillStyles.chipContainer}
+                    component={motion.div}
+                    layout
+                  >
+                    {currentExperience.skills.map((skill, index) => (
+                      <motion.div
+                        key={skill}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                      >
+                        <Chip
+                          label={skill}
+                          onDelete={() => handleSkillDelete(skill)}
+                          sx={{
+                            ...skillStyles.chip,
+                            backgroundColor: `hsl(${
+                              (index * 75) % 360
+                            }, 85%, 97%)`,
+                            color: `hsl(${(index * 75) % 360}, 85%, 35%)`,
+                            border: "1px solid",
+                            borderColor: `hsl(${(index * 75) % 360}, 85%, 90%)`,
+                            "&:hover": {
+                              backgroundColor: `hsl(${
+                                (index * 75) % 360
+                              }, 85%, 95%)`,
+                              borderColor: `hsl(${
+                                (index * 75) % 360
+                              }, 85%, 85%)`,
+                              transform: "translateY(-2px)",
+                            },
+                            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                          }}
+                        />
+                      </motion.div>
+                    ))}
+                  </Stack>
+                </AnimatePresence>
+              </Box>
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Certificate URL"
-                value={currentExperience.doc || ''}
-                onChange={(e) => setCurrentExperience({ ...currentExperience, doc: e.target.value })}
+                value={currentExperience.doc || ""}
+                onChange={(e) =>
+                  setCurrentExperience({
+                    ...currentExperience,
+                    doc: e.target.value,
+                  })
+                }
+                sx={formFieldStyles.textField}
               />
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button 
+        <DialogActions sx={{ p: 3, backgroundColor: "#F8FAFC" }}>
+          <Button
             onClick={handleClose}
-            sx={{ 
-              color: '#64748B',
-              textTransform: 'none',
-              '&:hover': { backgroundColor: '#F1F5F9' }
+            variant="outlined"
+            sx={{
+              borderColor: "#E2E8F0",
+              color: "#64748B",
+              "&:hover": {
+                borderColor: "#CBD5E1",
+                backgroundColor: "#F1F5F9",
+              },
             }}
           >
             Cancel
@@ -421,19 +1216,415 @@ const ExperienceForm = () => {
             variant="contained"
             startIcon={<SaveIcon />}
             sx={{
-              backgroundColor: '#0F172A',
-              '&:hover': { backgroundColor: '#1E293B' },
-              borderRadius: 2,
-              textTransform: 'none',
+              background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+              color: "white",
               px: 3,
+              py: 1,
+              borderRadius: 2,
+              textTransform: "none",
+              "&:hover": {
+                background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+              },
             }}
           >
-            {editMode ? 'Save Changes' : 'Add Experience'}
+            {editMode ? "Save Changes" : "Add Experience"}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  )
-}
 
-export default ExperienceForm 
+      <StyledDialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDelete}
+        maxWidth="sm"
+        fullWidth
+        TransitionComponent={motion.div}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        disableScrollLock={false}
+        onBackdropClick={handleCloseDelete}
+        PaperProps={{
+          sx: {
+            m: 2,
+            maxHeight: "calc(100% - 64px)",
+          },
+        }}
+      >
+        <StyledDialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <DeleteIcon sx={{ color: "#EF4444" }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Delete Experience
+              </Typography>
+            </Box>
+            <IconButton
+              onClick={handleCloseDelete}
+              sx={{
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  transform: "rotate(90deg)",
+                },
+                transition: "all 0.3s ease",
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </StyledDialogTitle>
+
+        <DialogContent sx={styles.dialogContent}>
+          {itemToDelete && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2.5,
+                  mb: 3,
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: "rgba(241, 245, 249, 0.5)",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                {/* Company Logo and Basic Info */}
+                <Box sx={{ display: "flex", gap: 2.5 }}>
+                  <Box
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 2,
+                      backgroundColor: "#F8FAFC",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    {itemToDelete.img ? (
+                      <Box
+                        component="img"
+                        src={itemToDelete.img}
+                        alt={itemToDelete.company}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          p: 2,
+                        }}
+                      />
+                    ) : (
+                      <WorkIcon sx={{ fontSize: 40, color: "#94A3B8" }} />
+                    )}
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 600, color: "#1E293B", mb: 0.5 }}
+                    >
+                      {itemToDelete.role}
+                    </Typography>
+                    <Typography variant="subtitle1" sx={{ color: "#64748B" }}>
+                      {itemToDelete.company}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "#94A3B8", display: "block", mt: 1 }}
+                    >
+                      {itemToDelete.date}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Skills */}
+                {itemToDelete.skills && itemToDelete.skills.length > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "#94A3B8", display: "block", mb: 1 }}
+                    >
+                      Skills & Technologies
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      flexWrap="wrap"
+                      sx={{ gap: 1 }}
+                    >
+                      {itemToDelete.skills.map((skill, index) => (
+                        <Chip
+                          key={index}
+                          label={skill}
+                          size="small"
+                          sx={{
+                            backgroundColor: "rgba(241, 245, 249, 0.8)",
+                            color: "#475569",
+                            fontSize: "0.75rem",
+                            height: "24px",
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Box>
+
+              <Typography
+                variant="body1"
+                sx={{ color: "#1E293B", mb: 2, fontWeight: 500 }}
+              >
+                Are you sure you want to delete this experience?
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#64748B",
+                  p: 2,
+                  borderRadius: 2,
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                }}
+              >
+                ⚠️ This action cannot be undone. The experience entry will be
+                permanently removed along with all associated information.
+              </Typography>
+            </motion.div>
+          )}
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            p: 3,
+            backgroundColor: "#F8FAFC",
+            borderTop: "1px solid rgba(226, 232, 240, 0.8)",
+          }}
+        >
+          <Button
+            onClick={handleCloseDelete}
+            variant="outlined"
+            sx={styles.cancelButton}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            sx={styles.deleteButton}
+          >
+            Delete Experience
+          </Button>
+        </DialogActions>
+      </StyledDialog>
+
+      <StyledDialog
+        open={skillDialogOpen}
+        onClose={handleCloseSkillDelete}
+        maxWidth="sm"
+        fullWidth
+        TransitionComponent={motion.div}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        PaperProps={{
+          sx: {
+            m: 2,
+            maxHeight: "calc(100% - 64px)",
+          },
+        }}
+      >
+        <StyledDialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <DeleteIcon sx={{ color: "#EF4444" }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Delete Skill
+              </Typography>
+            </Box>
+            <IconButton
+              onClick={handleCloseSkillDelete}
+              sx={{
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  transform: "rotate(90deg)",
+                },
+                transition: "all 0.3s ease",
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </StyledDialogTitle>
+
+        <DialogContent sx={styles.dialogContent}>
+          {skillToDelete && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2.5,
+                  mb: 3,
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: "rgba(241, 245, 249, 0.5)",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background:
+                        "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
+                      color: "white",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <CodeIcon />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ color: "#64748B", mb: 0.5 }}
+                    >
+                      Skill
+                    </Typography>
+                    <Chip
+                      label={skillToDelete}
+                      sx={{
+                        backgroundColor: `hsl(${
+                          Math.random() * 360
+                        }, 85%, 97%)`,
+                        color: `hsl(${Math.random() * 360}, 85%, 35%)`,
+                        fontWeight: 600,
+                        fontSize: "0.875rem",
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                <Box
+                  sx={{
+                    pt: 2,
+                    borderTop: "1px dashed rgba(203, 213, 225, 0.5)",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#94A3B8", display: "block", mb: 1 }}
+                  >
+                    Impact Information
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#475569" }}>
+                    This skill is currently associated with your experience
+                    entry and is used to showcase your technical expertise.
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Typography
+                variant="body1"
+                sx={{ color: "#1E293B", mb: 2, fontWeight: 500 }}
+              >
+                Are you sure you want to remove this skill?
+              </Typography>
+
+              <Typography
+                variant="body2"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                  color: "#64748B",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 1,
+                }}
+              >
+                <WarningIcon sx={{ color: "#EF4444", fontSize: 20 }} />
+                This action cannot be undone. The skill will be permanently
+                removed from this experience entry.
+              </Typography>
+            </motion.div>
+          )}
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            p: 3,
+            backgroundColor: "#F8FAFC",
+            borderTop: "1px solid rgba(226, 232, 240, 0.8)",
+          }}
+        >
+          <Button
+            onClick={handleCloseSkillDelete}
+            variant="outlined"
+            sx={styles.cancelButton}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmSkillDelete}
+            variant="contained"
+            sx={styles.deleteButton}
+          >
+            Remove Skill
+          </Button>
+        </DialogActions>
+      </StyledDialog>
+
+      <Fab
+        color="primary"
+        aria-label="add experience"
+        onClick={() => {
+          setEditMode(false);
+          setOpen(true);
+        }}
+        sx={styles.fabButton}
+      >
+        <AddIcon />
+      </Fab>
+
+      <Toaster
+        position="top-center"
+        toastOptions={toastConfig}
+        containerStyle={{
+          top: 20,
+        }}
+        gutter={8}
+      />
+    </Box>
+  );
+};
+
+export default ExperienceForm;
