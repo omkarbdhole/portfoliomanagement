@@ -139,7 +139,7 @@ const Login = () => {
           {/* Add Avatar here */}
           <Avatar
             src={avatarUrl}
-            alt="Sandesh Arsud"
+            alt="Omkar Dhole"
             sx={{
               width: 120,
               height: 120,
@@ -182,7 +182,7 @@ const Login = () => {
               fontWeight: 500,
             }}
           >
-            Sandesh Arsud Portfolio Management
+            Omkar Dhole Portfolio Management
           </Typography>
         </Box>
 
